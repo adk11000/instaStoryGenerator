@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Mobile Video Player</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #a3e635;
+    --accent2: #34d399;
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1c1c1c;
+    --border: rgba(255,255,255,0.07);
+    --text: rgba(255,255,255,0.9);
+    --muted: rgba(255,255,255,0.35);
+    --dim: rgba(255,255,255,0.12);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0 60px;
+  }
+
+  /* TOP NAV */
+  .topbar {
+    width: 100%; max-width: 520px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px 10px;
+  }
+  .topbar-title { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .topbar-mode {
+    font-size: 11px; color: var(--accent);
+    background: rgba(163,230,53,0.08); border: 1px solid rgba(163,230,53,0.2);
+    padding: 4px 10px; border-radius: 20px;
+    font-family: 'DM Mono', monospace; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .topbar-mode:hover { background: rgba(163,230,53,0.15); }
+
+  /* SETUP PANEL */
+  .setup-panel { width: 100%; max-width: 520px; padding: 0 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .setup-hint { font-size: 12px; color: var(--muted); text-align: center; padding: 8px 0 4px; letter-spacing: 0.3px; }
+
+  .slot-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+    transition: border-color 0.2s;
+  }
+  .slot-card.ready { border-color: rgba(163,230,53,0.25); }
+  .slot-header { display: flex; align-items: center; justify-content: space-between; }
+  .slot-num { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent); background: rgba(163,230,53,0.08); border-radius: 6px; padding: 2px 8px; }
+  .slot-status { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .dot-ind { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); transition: background 0.3s; }
+  .slot-card.ready .dot-ind { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .slot-card.ready .slot-status { color: var(--accent); }
+
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .upload-btn {
+    position: relative; overflow: hidden;
+    background: var(--surface2); border: 1px dashed var(--border);
+    border-radius: 12px; padding: 12px 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    cursor: pointer; transition: all 0.2s; min-height: 64px; justify-content: center;
+  }
+  .upload-btn:active { transform: scale(0.97); }
+  .upload-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; font-size: 0; }
+  .upload-icon { width: 22px; height: 22px; color: var(--muted); transition: color 0.2s; }
+  .upload-btn.has-file .upload-icon { color: var(--accent); }
+  .upload-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-family: 'DM Mono', monospace; text-align: center; }
+  .upload-btn.has-file .upload-label { color: var(--accent2); }
+  .upload-filename { font-size: 9px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; padding: 0 4px; }
+  .upload-btn.has-file { border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.04); }
+
+  .preview-strip { display: flex; gap: 8px; align-items: center; height: 38px; }
+  .preview-thumb { width: 60px; height: 38px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); display: none; }
+  .preview-vid-label { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .preview-vid-label.active { color: var(--accent2); }
+
+  /* LAUNCH */
+  .launch-wrap { width: 100%; max-width: 520px; padding: 4px 20px 16px; }
+  .launch-btn {
+    width: 100%; padding: 15px; border-radius: 16px; border: none;
+    background: var(--accent); color: #000;
+    font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .launch-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .launch-btn:not(:disabled):active { transform: scale(0.98); }
+  .launch-count { font-family: 'DM Mono', monospace; font-size: 12px; background: rgba(0,0,0,0.2); padding: 2px 7px; border-radius: 10px; }
+
+  /* DIVIDER */
+  .divider { width: 100%; max-width: 520px; display: flex; align-items: center; gap: 12px; padding: 4px 20px 16px; }
+  .divider-line { flex: 1; height: 1px; background: var(--border); }
+  .divider-txt { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 1px; }
+
+  /* PHONE */
+  .phone-frame {
+    width: min(300px, 82vw);
+    aspect-ratio: 9/19.5;
+    border-radius: 44px; border: 3px solid #222; background: #000;
+    overflow: hidden; position: relative; display: flex; flex-direction: column;
+    box-shadow: 0 0 0 1px #111, inset 0 0 0 1px #1a1a1a, 0 50px 100px rgba(0,0,0,0.9);
+  }
+  .phone-frame::before { content:''; position:absolute; right:-5px; top:110px; width:4px; height:55px; background:#1e1e1e; border-radius:0 3px 3px 0; box-shadow:0 80px 0 #1e1e1e; }
+  .phone-frame::after { content:''; position:absolute; left:-5px; top:90px; width:4px; height:32px; background:#1e1e1e; border-radius:3px 0 0 3px; box-shadow:0 48px 0 #1e1e1e, 0 90px 0 #1e1e1e; }
+
+  .notch { position:absolute; top:0; left:50%; transform:translateX(-50%); width:90px; height:22px; background:#000; border-radius:0 0 16px 16px; z-index:20; display:flex; align-items:center; justify-content:center; gap:7px; }
+  .n-speaker { width:38px; height:4px; background:#1c1c1c; border-radius:3px; }
+  .n-cam { width:9px; height:9px; border-radius:50%; background:#1a1a1a; border:1px solid #2a2a2a; }
+
+  .pstatusbar { height:26px; background:#000; display:flex; align-items:center; justify-content:space-between; padding:0 16px; flex-shrink:0; z-index:10; }
+  .ptime { font-family:'DM Mono',monospace; font-size:10px; color:rgba(255,255,255,0.75); }
+  .picons { display:flex; gap:4px; align-items:center; }
+  .picons svg { width:11px; height:11px; fill:rgba(255,255,255,0.6); }
+
+  .pscreen { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* VIDEO SECTIONS */
+  .vsec { flex:1; position:relative; overflow:hidden; cursor:pointer; }
+  .vsec + .vsec { border-top:1px solid rgba(255,255,255,0.05); }
+
+  .vsec-thumb { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; transition:opacity 0.4s; }
+  .vsec.inactive .vsec-thumb { opacity:1; }
+  .vsec.playing  .vsec-thumb { opacity:0; }
+  .vsec.done     .vsec-thumb { opacity:1; }
+
+  .vsec-placeholder { position:absolute; inset:0; z-index:1; }
+  .ph-0 { background:linear-gradient(135deg,#1a1a2e,#16213e); }
+  .ph-1 { background:linear-gradient(135deg,#0f1923,#1a2a1a); }
+  .ph-2 { background:linear-gradient(135deg,#1a1010,#2a1a0a); }
+
+  .vsec-vid { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:2; opacity:0; transition:opacity 0.4s; }
+  .vsec.playing .vsec-vid { opacity:1; }
+
+  .vsec-overlay { display:none; }
+  .vsec-loader { display:none; }
+  .ring-spin { display:none; }
+  .vsec-prog { display:none; }
+  .vsec-prog-fill { display:none; }
+  .vsec-wave { display:none; }
+  .vsec-done { display:none; }
+  .vsec-num { display:none; }
+
+  .phomebar { height:20px; background:#000; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .phomebar-pill { width:88px; height:3px; background:rgba(255,255,255,0.2); border-radius:3px; }
+
+  /* PLAYER CONTROLS */
+  .player-controls { width:100%; max-width:520px; padding:16px 20px 0; display:none; flex-direction:column; gap:14px; }
+  .player-controls.visible { display:flex; }
+  .ctrl-row { display:flex; gap:10px; }
+  .ctrl-btn { flex:1; padding:13px; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; font-weight:400; cursor:pointer; transition:all 0.2s; }
+  .ctrl-btn.primary { background:var(--accent); color:#000; border-color:transparent; font-weight:500; }
+  .ctrl-btn:active { transform:scale(0.97); }
+  .dots-status { display:flex; align-items:center; gap:10px; justify-content:center; }
+  .pdot { width:5px; height:5px; border-radius:50%; background:var(--dim); transition:all 0.3s; }
+  .pdot.on { background:var(--accent); box-shadow:0 0 8px var(--accent); transform:scale(1.4); }
+  .pdot.done { background:rgba(163,230,53,0.3); }
+  .pstatus-txt { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:1px; }
+
+  .empty-phone { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:#050505; }
+  .empty-icon { font-size:28px; opacity:0.3; }
+  .empty-txt { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; letter-spacing:1.5px; text-transform:uppercase; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-title">vid · player</span>
+  <span class="topbar-mode" id="toggle-btn" onclick="toggleSetup()">↑ setup</span>
+</div>
+
+<div class="setup-panel" id="setup-panel">
+  <p class="setup-hint">Upload a video + thumbnail for each section</p>
+
+  <!-- Slot 1 -->
+  <div class="slot-card" id="slot-0">
+    <div class="slot-header">
+      <span class="slot-num">01</span>
+      <span class="slot-status"><span class="dot-ind"></span><span id="slbl-0">waiting</span></span>
+    </div>
+    <div class="input-row">
+      <label class="upload-btn" id="vbtn-0">
+        <input type="file" accept="video/*" onchange="handleVideo(0,this)">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <span class="upload-label">Video</span>
+        <span class="upload-filename" id="vname-0">tap to choose</span>
+      </label>
+      <label class="upload-btn" id="ibtn-0">
+        <input type="file" accept="image/*" onchange="handleImage(0,this)">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span class="upload-label">Thumbnail</span>
+        <span class="upload-filename" id="iname-0">tap to choose</span>
+      </label>
+    </div>
+    <div class="preview-strip">
+      <img class="preview-thumb" id="prev-0" alt="">
+      <span class="preview-vid-label" id="prevlbl-0">no files selected</span>
+    </div>
+  </div>
+
+  <!-- Slot 2 -->
+  <div class="slot-card" id="slot-1">
+    <div class="slot-header">
+      <span class="slot-num">02</span>
+      <span class="slot-status"><span class="dot-ind"></span><span id="slbl-1">waiting</span></span>
+    </div>
+    <div class="input-row">
+      <label class="upload-btn" id="vbtn-1">
+        <input type="file" accept="video/*" onchange="handleVideo(1,this)">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <span class="upload-label">Video</span>
+        <span class="upload-filename" id="vname-1">tap to choose</span>
+      </label>
+      <label class="upload-btn" id="ibtn-1">
+        <input type="file" accept="image/*" onchange="handleImage(1,this)">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span class="upload-label">Thumbnail</span>
+        <span class="upload-filename" id="iname-1">tap to choose</span>
+      </label>
+    </div>
+    <div class="preview-strip">
+      <img class="preview-thumb" id="prev-1" alt="">
+      <span class="preview-vid-label" id="prevlbl-1">no files selected</span>
+    </div>
+  </div>
+
+  <!-- Slot 3 -->
+  <div class="slot-card" id="slot-2">
+    <div class="slot-header">
+      <span class="slot-num">03</span>
+      <span class="slot-status"><span class="dot-ind"></span><span id="slbl-2">waiting</span></span>
+    </div>
+    <div class="input-row">
+      <label class="upload-btn" id="vbtn-2">
+        <input type="file" accept="video/*" onchange="handleVideo(2,this)">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <span class="upload-label">Video</span>
+        <span class="upload-filename" id="vname-2">tap to choose</span>
+      </label>
+      <label class="upload-btn" id="ibtn-2">
+        <input type="file" accept="image/*" onchange="handleImage(2,this)">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span class="upload-label">Thumbnail</span>
+        <span class="upload-filename" id="iname-2">tap to choose</span>
+      </label>
+    </div>
+    <div class="preview-strip">
+      <img class="preview-thumb" id="prev-2" alt="">
+      <span class="preview-vid-label" id="prevlbl-2">no files selected</span>
+    </div>
+  </div>
+</div>
+
+<div class="launch-wrap" id="launch-wrap">
+  <button class="launch-btn" id="launch-btn" disabled onclick="launchPlayer()">
+    Launch Player
+    <span class="launch-count" id="launch-count">0 / 3</span>
+  </button>
+</div>
+
+<div class="divider" id="divider-el">
+  <div class="divider-line"></div>
+  <span class="divider-txt">preview</span>
+  <div class="divider-line"></div>
+</div>
+
+<div class="phone-frame">
+  <div class="notch"><div class="n-speaker"></div><div class="n-cam"></div></div>
+  <div class="pstatusbar">
+    <span class="ptime" id="pclock">9:41</span>
+    <div class="picons">
+      <svg viewBox="0 0 24 24"><rect x="2" y="8" width="4" height="8" rx="1"/><rect x="8" y="5" width="4" height="11" rx="1"/><rect x="14" y="2" width="4" height="14" rx="1"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M23 12a11 11 0 0 1-22 0"/><rect x="9" y="11" width="6" height="7" rx="1"/></svg>
+    </div>
+  </div>
+  <div class="pscreen" id="pscreen">
+    <div class="empty-phone" id="empty-phone">
+      <div class="empty-icon">▤</div>
+      <div class="empty-txt">upload files above</div>
+    </div>
+  </div>
+  <div class="phomebar"><div class="phomebar-pill"></div></div>
+</div>
+
+<div class="player-controls" id="player-controls">
+  <div class="ctrl-row">
+    <button class="ctrl-btn primary" onclick="startSequence()">▶ Play All</button>
+    <button class="ctrl-btn" onclick="resetAll()">↺ Reset</button>
+  </div>
+  <div class="dots-status">
+    <div class="pdot" id="pdot-0"></div>
+    <div class="pdot" id="pdot-1"></div>
+    <div class="pdot" id="pdot-2"></div>
+    <span class="pstatus-txt" id="pstatus">tap play to begin</span>
+  </div>
+</div>
+
+<script>
+const slots = [
+  { videoSrc: null, imageSrc: null, dur: 10000 },
+  { videoSrc: null, imageSrc: null, dur: 10000 },
+  { videoSrc: null, imageSrc: null, dur: 10000 }
+];
+let playerBuilt = false, current = -1;
+let progTimer = null, autoNextTimer = null;
+let setupOpen = true;
+
+function tick() {
+  const n = new Date();
+  document.getElementById('pclock').textContent =
+    n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0');
+}
+tick(); setInterval(tick, 15000);
+
+function trunc(s, max) { return s.length > max ? s.slice(0, max) + '…' : s; }
+
+function handleVideo(i, inp) {
+  const f = inp.files[0]; if (!f) return;
+  const url = URL.createObjectURL(f);
+  slots[i].videoSrc = url;
+  const tmp = document.createElement('video');
+  tmp.src = url;
+  tmp.onloadedmetadata = () => { slots[i].dur = tmp.duration * 1000; };
+  document.getElementById('vname-' + i).textContent = trunc(f.name, 14);
+  document.getElementById('vbtn-' + i).classList.add('has-file');
+  const lbl = document.getElementById('prevlbl-' + i);
+  lbl.textContent = trunc(f.name, 22); lbl.classList.add('active');
+  updateSlot(i); updateLaunch();
+  if (playerBuilt) { const v = document.getElementById('vvid-' + i); if(v){v.src=url;v.load();} }
+}
+
+function handleImage(i, inp) {
+  const f = inp.files[0]; if (!f) return;
+  const url = URL.createObjectURL(f);
+  slots[i].imageSrc = url;
+  document.getElementById('iname-' + i).textContent = trunc(f.name, 14);
+  document.getElementById('ibtn-' + i).classList.add('has-file');
+  const p = document.getElementById('prev-' + i);
+  p.src = url; p.style.display = 'block';
+  updateSlot(i); updateLaunch();
+  if (playerBuilt) { const t = document.getElementById('vthumb-' + i); if(t){t.src=url;t.style.display='';} }
+}
+
+function updateSlot(i) {
+  const card = document.getElementById('slot-' + i);
+  const lbl = document.getElementById('slbl-' + i);
+  if (slots[i].videoSrc && slots[i].imageSrc) { card.classList.add('ready'); lbl.textContent = 'ready'; }
+  else if (slots[i].videoSrc || slots[i].imageSrc) lbl.textContent = 'partial';
+}
+
+function updateLaunch() {
+  const n = slots.filter(s => s.videoSrc).length;
+  document.getElementById('launch-btn').disabled = n === 0;
+  document.getElementById('launch-count').textContent = n + ' / 3';
+}
+
+function launchPlayer() {
+  buildPlayer();
+  if (setupOpen) toggleSetup();
+}
+
+function buildPlayer() {
+  const screen = document.getElementById('pscreen');
+  const emp = document.getElementById('empty-phone');
+  if (emp) emp.remove();
+  screen.querySelectorAll('.vsec').forEach(e => e.remove());
+
+  for (let i = 0; i < 3; i++) {
+    const s = slots[i];
+    const sec = document.createElement('div');
+    sec.className = 'vsec inactive'; sec.id = 'vsec-' + i;
+    sec.onclick = () => jumpTo(i);
+    sec.innerHTML = `
+      <div class="vsec-placeholder ph-${i}"></div>
+      <img class="vsec-thumb" id="vthumb-${i}" alt="" style="${s.imageSrc ? '' : 'display:none'}" ${s.imageSrc ? 'src="'+s.imageSrc+'"' : ''}>
+      <video class="vsec-vid" id="vvid-${i}" playsinline preload="auto" ${s.videoSrc ? 'src="'+s.videoSrc+'"' : ''}></video>
+      <div class="vsec-overlay"></div>
+      <div class="vsec-loader"><div class="ring-spin"></div></div>
+      <div class="vsec-wave"><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div></div>
+      <div class="vsec-done"><svg viewBox="0 0 12 12" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></div>
+      <div class="vsec-prog"><div class="vsec-prog-fill" id="vprog-${i}"></div></div>
+      <span class="vsec-num">0${i+1} / 03</span>
+    `;
+    screen.appendChild(sec);
+  }
+  playerBuilt = true;
+  document.getElementById('player-controls').classList.add('visible');
+  resetAll();
+}
+
+function setS(i, state) {
+  const el = document.getElementById('vsec-' + i); if (!el) return;
+  el.classList.remove('inactive','loading','playing','done');
+  el.classList.add(state);
+}
+function setDot(i, st) {
+  const d = document.getElementById('pdot-' + i); if (!d) return;
+  d.classList.remove('on','done'); if (st) d.classList.add(st);
+}
+function stopTimers() {
+  if (progTimer) { clearInterval(progTimer); progTimer = null; }
+  if (autoNextTimer) { clearTimeout(autoNextTimer); autoNextTimer = null; }
+}
+
+const PLAY_ORDER = [0, 2, 1];
+function startSequence() { resetAll(); setTimeout(() => playOrderStep(0), 80); }
+
+function playOrderStep(step) {
+  if (step >= PLAY_ORDER.length) { document.getElementById('pstatus').textContent = 'all done ✓'; current = -1; return; }
+  const i = PLAY_ORDER[step];
+  if (!slots[i].videoSrc) { playOrderStep(step + 1); return; }
+  current = i;
+  for (let j = 0; j < 3; j++) {
+    if (j === i) continue;
+    const el = document.getElementById('vsec-' + j);
+    if (el && !el.classList.contains('done')) { setS(j, 'inactive'); setDot(j, ''); }
+  }
+  setS(i, 'loading'); setDot(i, 'on');
+  document.getElementById('pstatus').textContent = 'playing · section ' + (i+1);
+  const vid = document.getElementById('vvid-' + i);
+  vid.currentTime = 0;
+  const go = () => {
+    setS(i, 'playing');
+    vid.play().catch(()=>{});
+    const dur = (vid.duration && isFinite(vid.duration)) ? vid.duration * 1000 : slots[i].dur;
+    const bar = document.getElementById('vprog-' + i);
+    if (bar) bar.style.width = '0%';
+    stopTimers();
+    const t0 = Date.now();
+    progTimer = setInterval(() => {
+      const pct = Math.min(100, ((Date.now()-t0)/dur)*100);
+      if (bar) bar.style.width = pct + '%';
+      if (pct >= 100) { clearInterval(progTimer); progTimer = null; }
+    }, 80);
+    autoNextTimer = setTimeout(() => {
+      stopTimers();
+      if (vid) vid.pause();
+      setS(i, 'done'); setDot(i, 'done');
+      playOrderStep(step + 1);
+    }, dur);
+  };
+  if (vid.readyState >= 3) setTimeout(go, 200);
+  else { vid.oncanplay = () => { vid.oncanplay = null; setTimeout(go, 200); }; }
+}
+
+function playSection(i) {
+  if (i >= 3) { document.getElementById('pstatus').textContent = 'all done ✓'; current = -1; return; }
+  if (!slots[i].videoSrc) { finishSection(i); return; }
+  current = i;
+  for (let j = 0; j < 3; j++) {
+    if (j === i) continue;
+    const el = document.getElementById('vsec-' + j);
+    if (el && !el.classList.contains('done')) { setS(j, 'inactive'); setDot(j, ''); }
+  }
+  setS(i, 'loading'); setDot(i, 'on');
+  document.getElementById('pstatus').textContent = 'playing · section ' + (i+1);
+  const vid = document.getElementById('vvid-' + i);
+  vid.currentTime = 0;
+  const go = () => {
+    setS(i, 'playing');
+    vid.play().catch(()=>{});
+    const dur = (vid.duration && isFinite(vid.duration)) ? vid.duration * 1000 : slots[i].dur;
+    const bar = document.getElementById('vprog-' + i);
+    if (bar) bar.style.width = '0%';
+    stopTimers();
+    const t0 = Date.now();
+    progTimer = setInterval(() => {
+      const pct = Math.min(100, ((Date.now()-t0)/dur)*100);
+      if (bar) bar.style.width = pct + '%';
+      if (pct >= 100) { clearInterval(progTimer); progTimer = null; }
+    }, 80);
+    autoNextTimer = setTimeout(() => finishSection(i), dur);
+  };
+  if (vid.readyState >= 3) setTimeout(go, 200);
+  else { vid.oncanplay = () => { vid.oncanplay = null; setTimeout(go, 200); }; }
+}
+
+function finishSection(i) {
+  stopTimers();
+  const bar = document.getElementById('vprog-' + i); if (bar) bar.style.width = '100%';
+  const vid = document.getElementById('vvid-' + i); if (vid) vid.pause();
+  setS(i, 'done'); setDot(i, 'done');
+  playSection(i + 1);
+}
+
+function jumpTo(i) {
+  if (current === i) return;
+  stopTimers();
+  if (current >= 0) { const v = document.getElementById('vvid-' + current); if(v) v.pause(); }
+  for (let j = 0; j < 3; j++) {
+    if (j < i) { setS(j,'done'); const b=document.getElementById('vprog-'+j); if(b) b.style.width='100%'; setDot(j,'done'); }
+    else if (j > i) { setS(j,'inactive'); const b=document.getElementById('vprog-'+j); if(b) b.style.width='0%'; setDot(j,''); }
+  }
+  playSection(i);
+}
+
+function resetAll() {
+  stopTimers(); current = -1;
+  for (let i = 0; i < 3; i++) {
+    const vid = document.getElementById('vvid-' + i);
+    if (vid) { vid.pause(); vid.currentTime = 0; }
+    const bar = document.getElementById('vprog-' + i); if (bar) bar.style.width = '0%';
+    setS(i, 'inactive'); setDot(i, '');
+  }
+  document.getElementById('pstatus').textContent = 'tap play to begin';
+}
+
+function toggleSetup() {
+  setupOpen = !setupOpen;
+  const panel = document.getElementById('setup-panel');
+  const lw = document.getElementById('launch-wrap');
+  const div = document.getElementById('divider-el');
+  const btn = document.getElementById('toggle-btn');
+  if (setupOpen) {
+    panel.style.display = ''; lw.style.display = ''; div.style.display = '';
+    btn.textContent = '↑ setup';
+  } else {
+    panel.style.display = 'none'; lw.style.display = 'none'; div.style.display = 'none';
+    btn.textContent = '↓ setup';
+  }
+}
+</script>
+</body>
+</html>
